@@ -93,47 +93,9 @@ class Client:
         
         threading.Thread(target=heartbeat_loop, daemon=True).start()
     
-    def measure_network_speed(self, data_size=1000):
-        """Measure network speed by sending test data"""
-        try:
-            test_data = list(range(data_size))
-            
-            # Measure upload speed
-            start_time = time.time()
-            response = requests.post(f"{self.server_url}/api/network-test", 
-                                   json={'data': test_data, 'client_id': self.client_id},
-                                   timeout=10)
-            upload_time = time.time() - start_time
-            
-            if response.status_code == 200:
-                result = response.json()
-                download_time = result.get('processing_time', 0)
-                
-                upload_speed = (data_size * 4) / upload_time  # Approximate bytes per second
-                download_speed = (data_size * 4) / download_time if download_time > 0 else 0
-                
-                print(f"Network Speed Test:")
-                print(f"  Upload: {upload_speed:.2f} bytes/sec")
-                print(f"  Download: {download_speed:.2f} bytes/sec")
-                print(f"  Round-trip: {upload_time + download_time:.3f}s")
-                
-                return {
-                    'upload_speed': upload_speed,
-                    'download_speed': download_speed,
-                    'round_trip_time': upload_time + download_time
-                }
-        except Exception as e:
-            print(f"Network speed test failed: {e}")
-        
-        return None
-    
     def process_work(self):
         """Main work loop with enhanced progress visualization"""
         print("Starting work processor...")
-        
-        # Run initial network speed test
-        print("Performing initial network speed test...")
-        network_info = self.measure_network_speed(1000)
         
         while self.running:
             try:
@@ -164,7 +126,7 @@ class Client:
                 print(f"Chunk {chunk_id} | {len(data)} numbers | Algorithm: {algorithm}")
                 print(f"Data range: {min(data)} to {max(data)}")
                 
-                # Record start time for network measurement
+                # Record start time
                 work_start_time = time.time()
                 
                 # Choose the appropriate sorting function
@@ -192,19 +154,13 @@ class Client:
                     'client_id': self.client_id,
                     'processed_data': sorted_data,
                     'processing_time': processing_time,
-                    'chunk_id': chunk_id,
-                    'network_time': time.time() - work_start_time  # Total time including network
+                    'chunk_id': chunk_id
                 }, timeout=10)
                 
                 if submit_response.status_code == 200:
                     print("Result submitted successfully!")
                 else:
                     print("Submit failed")
-                
-                # Run periodic network speed test (every 10 minutes)
-                if int(time.time()) % 600 == 0:  # Every 10 minutes
-                    print("Running periodic network speed test...")
-                    self.measure_network_speed(1000)
                 
             except requests.exceptions.Timeout:
                 print("Request timeout")
@@ -230,16 +186,10 @@ def main():
     parser = argparse.ArgumentParser(description='Sorting Client')
     parser.add_argument('--server', default='http://localhost:5000', help='Master server URL')
     parser.add_argument('--name', help='Custom client name')
-    parser.add_argument('--network-test', action='store_true', help='Run network test and exit')
     
     args = parser.parse_args()
     
     client = Client(args.server, args.name)
-    
-    if args.network_test:
-        print("Running network speed test...")
-        client.measure_network_speed(5000)
-        return
     
     try:
         client.process_work()

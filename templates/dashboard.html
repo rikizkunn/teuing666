@@ -52,32 +52,6 @@
                     </button>
                 </div>
 
-                <!-- Network Performance -->
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h2 class="text-xl font-semibold mb-4 text-gray-800">
-                        <i class="fas fa-network-wired mr-2 text-purple-500"></i>Network Performance
-                    </h2>
-
-                    <div class="grid grid-cols-3 gap-4 mb-4">
-                        <div class="text-center p-3 bg-blue-50 rounded-lg">
-                            <div class="text-lg font-bold text-blue-600" id="avgUpload">-</div>
-                            <div class="text-xs text-blue-800">Avg Upload</div>
-                        </div>
-                        <div class="text-center p-3 bg-green-50 rounded-lg">
-                            <div class="text-lg font-bold text-green-600" id="avgDownload">-</div>
-                            <div class="text-xs text-green-800">Avg Download</div>
-                        </div>
-                        <div class="text-center p-3 bg-purple-50 rounded-lg">
-                            <div class="text-lg font-bold text-purple-600" id="avgRTT">-</div>
-                            <div class="text-xs text-purple-800">Avg RTT</div>
-                        </div>
-                    </div>
-
-                    <div id="networkTests" class="space-y-2 max-h-32 overflow-y-auto">
-                        <!-- Network test results will appear here -->
-                    </div>
-                </div>
-
                 <!-- Latest Performance -->
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-xl font-semibold mb-4 text-gray-800">
@@ -394,40 +368,6 @@
             const benchmarksData = await benchmarksResponse.json();
             updateBenchmarks(benchmarksData.benchmarks);
             updatePerformanceStats(benchmarksData.performance_stats);
-            updateNetworkStats(benchmarksData.performance_stats, benchmarksData.network_benchmarks);
-        }
-
-        function updateNetworkStats(stats, networkTests) {
-            const networkStats = stats.network_stats || {};
-
-            // Update averages
-            document.getElementById('avgUpload').textContent =
-                networkStats.average_upload ? `${(networkStats.average_upload / 1024).toFixed(1)} KB/s` : '-';
-            document.getElementById('avgDownload').textContent =
-                networkStats.average_download ? `${(networkStats.average_download / 1024).toFixed(1)} KB/s` : '-';
-            document.getElementById('avgRTT').textContent =
-                networkStats.average_rtt ? `${networkStats.average_rtt.toFixed(3)}s` : '-';
-
-            // Update network tests list
-            const container = document.getElementById('networkTests');
-            if (!networkTests || networkTests.length === 0) {
-                container.innerHTML = '<div class="text-center text-gray-500 text-sm">No network tests yet</div>';
-                return;
-            }
-
-            container.innerHTML = '';
-            networkTests.reverse().forEach(test => {
-                const testEl = document.createElement('div');
-                testEl.className = 'text-xs bg-gray-50 p-2 rounded';
-                testEl.innerHTML = `
-                    <div class="flex justify-between">
-                        <span>↑${(test.upload_speed / 1024).toFixed(1)} KB/s</span>
-                        <span>↓${(test.download_speed / 1024).toFixed(1)} KB/s</span>
-                        <span>${test.round_trip_time.toFixed(3)}s</span>
-                    </div>
-                `;
-                container.appendChild(testEl);
-            });
         }
 
         function updateClientsList(clients) {
@@ -648,9 +588,6 @@
                 benchmarkEl.className = 'p-3 bg-gray-50 rounded-md border-l-4 ' + 
                     (benchmark.mode === 'serial' ? 'border-red-400' : 'border-green-400');
                 
-                const networkOverhead = benchmark.network_overhead || 0;
-                const overheadPercent = networkOverhead > 0 ? (networkOverhead / benchmark.total_time * 100).toFixed(1) : 0;
-                
                 benchmarkEl.innerHTML = `
                     <div class="flex justify-between items-start">
                         <div>
@@ -661,11 +598,6 @@
                             <div class="text-xs text-gray-500 mt-1">
                                 ${benchmark.clients_count} client(s)
                             </div>
-                            ${networkOverhead > 0 ? `
-                            <div class="text-xs text-orange-600 mt-1">
-                                Network: ${overheadPercent}%
-                            </div>
-                            ` : ''}
                         </div>
                         <div class="text-right">
                             <div class="font-bold text-lg">${benchmark.total_time?.toFixed(3)}s</div>
