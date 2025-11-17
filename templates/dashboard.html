@@ -394,4 +394,16 @@
     </script>
 </body>
 
+</html>     });
+        }
+
+        function startProgressRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(refreshProgress, 1000);
+        }
+
+        // Initialize
+        startProgressRefresh();
+    </script>
+</body>
 </html>

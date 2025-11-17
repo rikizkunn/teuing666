@@ -1,35 +1,43 @@
-# fixed_computer2.py
+# universal_client.py
 import requests
 import time
 import threading
+import socket
+import os
 
-class FixedClient:
-    def __init__(self, server_url, client_id):
+class UniversalClient:
+    def __init__(self, server_url, client_name=None):
         self.server_url = server_url
-        self.client_id = client_id
+        self.client_id = client_name or f"{socket.gethostname()}_{os.getpid()}"
         self.algorithms = {
             'quicksort': self.quick_sort,
             'mergesort': self.merge_sort,
             'bubblesort': self.bubble_sort
         }
         self.running = True
+        self.current_mode = None
+        
+        print(f"🚀 Starting Universal Client: {self.client_id}")
+        print(f"📋 Supported algorithms: {list(self.algorithms.keys())}")
+        
         self.register()
         self.start_heartbeat()
     
     def register(self):
-        """Register with enhanced capabilities"""
+        """Register with master server"""
         try:
             response = requests.post(f"{self.server_url}/api/register", json={
                 'client_id': self.client_id,
                 'capabilities': ['serial', 'parallel'],
-                'algorithms': list(self.algorithms.keys())
+                'algorithms': list(self.algorithms.keys()),
+                'hostname': socket.gethostname()
             }, timeout=5)
-            print(f"Registered: {response.json()}")
+            print(f"✅ Registered with master: {response.json()}")
         except Exception as e:
-            print(f"Registration failed: {e}")
+            print(f"❌ Registration failed: {e}")
     
     def start_heartbeat(self):
-        """Start heartbeat thread to keep connection alive"""
+        """Send heartbeat every 3 seconds to stay connected"""
         def heartbeat_loop():
             while self.running:
                 try:
@@ -37,23 +45,20 @@ class FixedClient:
                                            json={'client_id': self.client_id},
                                            timeout=5)
                     if response.status_code == 200:
-                        print(f"♥ Heartbeat sent for {self.client_id}")
+                        print(f"♥ Heartbeat sent - Mode: {self.current_mode or 'idle'}")
                     else:
-                        print(f"Heartbeat failed: {response.status_code}")
-                        # Try to re-register
+                        print("⚠ Heartbeat failed, re-registering...")
                         self.register()
                 except Exception as e:
-                    print(f"Heartbeat error: {e}")
-                    # Try to re-register
+                    print(f"💔 Heartbeat error: {e}")
                     self.register()
                 
-                time.sleep(3)  # Send heartbeat every 3 seconds
+                time.sleep(3)
         
-        heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
-        heartbeat_thread.start()
-        print("Heartbeat started")
+        threading.Thread(target=heartbeat_loop, daemon=True).start()
     
     def quick_sort(self, arr):
+        """Quick sort implementation"""
         if len(arr) <= 1:
             return arr
         pivot = arr[len(arr) // 2]
@@ -63,6 +68,7 @@ class FixedClient:
         return self.quick_sort(left) + middle + self.quick_sort(right)
     
     def merge_sort(self, arr):
+        """Merge sort implementation"""
         if len(arr) <= 1:
             return arr
         
@@ -73,6 +79,7 @@ class FixedClient:
         return self.merge(left, right)
     
     def merge(self, left, right):
+        """Merge helper for merge sort"""
         result = []
         i = j = 0
         
@@ -89,6 +96,7 @@ class FixedClient:
         return result
     
     def bubble_sort(self, arr):
+        """Bubble sort implementation"""
         n = len(arr)
         for i in range(n):
             for j in range(0, n - i - 1):
@@ -97,8 +105,8 @@ class FixedClient:
         return arr
     
     def process_work(self):
-        """Continuously process work from server"""
-        print(f"Client {self.client_id} started and ready for work...")
+        """Main work loop - processes whatever work master assigns"""
+        print("🔄 Starting work processor...")
         
         while self.running:
             try:
@@ -107,18 +115,24 @@ class FixedClient:
                 work = response.json()
                 
                 if work.get('status') == 'no_work':
-                    print("No work available, waiting...")
+                    if self.current_mode != 'idle':
+                        print("💤 No work available, waiting...")
+                        self.current_mode = 'idle'
                     time.sleep(5)
                     continue
                 
-                # Process the data
+                # Process the assigned work
                 data = work['data']
                 algorithm = work['algorithm']
                 batch_id = work['batch_id']
                 chunk_id = work.get('chunk_id', 0)
                 mode = work.get('mode', 'unknown')
                 
-                print(f"🚀 Processing {len(data)} numbers using {algorithm} ({mode} mode)")
+                if mode != self.current_mode:
+                    self.current_mode = mode
+                    print(f"🔄 Mode changed to: {mode.upper()}")
+                
+                print(f"⚡ Processing {mode} work - {len(data)} numbers using {algorithm}")
                 
                 start_time = time.time()
                 sorted_data = self.algorithms[algorithm](data.copy())
@@ -136,29 +150,37 @@ class FixedClient:
                 if submit_response.status_code == 200:
                     print(f"✅ Completed in {processing_time:.3f}s")
                 else:
-                    print(f"❌ Submit failed: {submit_response.status_code}")
+                    print(f"❌ Submit failed")
                 
             except requests.exceptions.Timeout:
-                print("Request timeout, retrying...")
+                print("⏰ Request timeout")
             except requests.exceptions.ConnectionError:
-                print("Connection error, retrying in 10 seconds...")
+                print("🔌 Connection error, retrying in 10s...")
                 time.sleep(10)
             except Exception as e:
-                print(f"Error: {e}")
+                print(f"💥 Error: {e}")
                 time.sleep(5)
     
     def stop(self):
         """Stop the client"""
         self.running = False
+        print("🛑 Client stopped")
 
 def main():
-    server_url = "http://localhost:5000"  # Change to your server IP
-    client = FixedClient(server_url, "computer2")
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Universal Sorting Client')
+    parser.add_argument('--server', default='http://localhost:5000', help='Master server URL')
+    parser.add_argument('--name', help='Custom client name')
+    
+    args = parser.parse_args()
+    
+    client = UniversalClient(args.server, args.name)
     
     try:
         client.process_work()
     except KeyboardInterrupt:
-        print("\nShutting down client...")
+        print("\n👋 Shutting down...")
         client.stop()
 
 if __name__ == '__main__':
