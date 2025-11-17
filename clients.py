@@ -5,7 +5,6 @@ import threading
 import socket
 import os
 import sys
-import psutil
 import platform
 
 class Client:
@@ -28,21 +27,38 @@ class Client:
         self.start_heartbeat()
     
     def get_system_info(self):
-        """Get client system information"""
+        """Get client system information (Windows compatible)"""
         try:
-            return {
-                'cpu_cores': psutil.cpu_count(),
-                'cpu_usage': psutil.cpu_percent(),
-                'memory_total': psutil.virtual_memory().total,
-                'memory_used': psutil.virtual_memory().used,
-                'memory_percent': psutil.virtual_memory().percent,
+            system_info = {
                 'platform': platform.system(),
                 'platform_version': platform.version(),
-                'hostname': socket.gethostname()
+                'hostname': socket.gethostname(),
+                'processor': platform.processor(),
+                'architecture': platform.architecture()[0],
+                'python_version': platform.python_version()
             }
+            
+            # Try to get Windows-specific info
+            if platform.system() == "Windows":
+                try:
+                    import psutil
+                    system_info.update({
+                        'cpu_cores': psutil.cpu_count(),
+                        'cpu_usage': psutil.cpu_percent(),
+                        'memory_total': psutil.virtual_memory().total,
+                        'memory_used': psutil.virtual_memory().used,
+                        'memory_percent': psutil.virtual_memory().percent
+                    })
+                except ImportError:
+                    print("psutil not available, skipping detailed system info")
+            
+            return system_info
         except Exception as e:
             print(f"Error getting system info: {e}")
-            return {}
+            return {
+                'platform': platform.system(),
+                'hostname': socket.gethostname()
+            }
     
     def register(self):
         """Register with master server"""
@@ -168,7 +184,7 @@ class Client:
         result = []
         i = j = 0
         
-        while i < len(left) and j < len(right):
+        while i < len(left) and j in range(len(right)):
             if left[i] < right[j]:
                 result.append(left[i])
                 i += 1

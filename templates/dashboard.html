@@ -21,31 +21,6 @@
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
             <!-- Left Column -->
             <div class="xl:col-span-2 space-y-6">
-                <!-- System Information -->
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <h2 class="text-xl font-semibold mb-4 text-gray-800">
-                        <i class="fas fa-server mr-2 text-blue-500"></i>System Information
-                    </h2>
-                    <div id="systemInfo" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="text-center p-3 bg-gray-50 rounded-lg">
-                            <div class="text-lg font-bold text-blue-600" id="cpuCores">-</div>
-                            <div class="text-xs text-gray-600">CPU Cores</div>
-                        </div>
-                        <div class="text-center p-3 bg-gray-50 rounded-lg">
-                            <div class="text-lg font-bold text-green-600" id="cpuUsage">-</div>
-                            <div class="text-xs text-gray-600">CPU Usage</div>
-                        </div>
-                        <div class="text-center p-3 bg-gray-50 rounded-lg">
-                            <div class="text-lg font-bold text-purple-600" id="memoryUsage">-</div>
-                            <div class="text-xs text-gray-600">Memory Usage</div>
-                        </div>
-                        <div class="text-center p-3 bg-gray-50 rounded-lg">
-                            <div class="text-lg font-bold text-orange-600" id="platform">-</div>
-                            <div class="text-xs text-gray-600">Platform</div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Data Generation -->
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-xl font-semibold mb-4 text-gray-800">
@@ -370,11 +345,6 @@
 
         // Refresh progress
         async function refreshProgress() {
-            // Update system info
-            const systemResponse = await fetch('/api/system_info');
-            const systemData = await systemResponse.json();
-            updateSystemInfo(systemData);
-
             // Update clients
             const clientsResponse = await fetch('/api/clients');
             const clientsData = await clientsResponse.json();
@@ -394,13 +364,6 @@
             const benchmarksData = await benchmarksResponse.json();
             updateBenchmarks(benchmarksData.benchmarks);
             updatePerformanceStats(benchmarksData.performance_stats);
-        }
-
-        function updateSystemInfo(systemInfo) {
-            document.getElementById('cpuCores').textContent = systemInfo.cpu_cores || '-';
-            document.getElementById('cpuUsage').textContent = (systemInfo.cpu_usage || '0') + '%';
-            document.getElementById('memoryUsage').textContent = (systemInfo.memory_percent || '0') + '%';
-            document.getElementById('platform').textContent = systemInfo.platform || '-';
         }
 
         function updateClientsList(clients) {
@@ -428,6 +391,7 @@
                     'bg-yellow-100 text-yellow-800';
 
                 const systemInfo = client.system_info || {};
+                const platform = systemInfo.platform || 'Unknown';
                 const cpuCores = systemInfo.cpu_cores || '?';
                 const memory = systemInfo.memory_percent ? Math.round(systemInfo.memory_percent) + '%' : '?';
 
@@ -439,7 +403,7 @@
                         <span class="px-2 py-1 text-xs rounded-full ${statusColor}">${client.status}</span>
                     </div>
                     <div class="text-xs text-gray-600 space-y-1">
-                        <div>Host: ${client.hostname}</div>
+                        <div>${platform} • ${client.hostname}</div>
                         <div>CPU: ${cpuCores} cores | RAM: ${memory}</div>
                         <div class="text-gray-500">${client.algorithms.join(', ')}</div>
                     </div>

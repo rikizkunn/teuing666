@@ -6,8 +6,6 @@ import json
 from collections import defaultdict
 from datetime import datetime
 import threading
-import psutil
-import platform
 
 app = Flask(__name__)
 
@@ -23,18 +21,6 @@ performance_stats = {
     'latest_parallel': None,
     'average_times': defaultdict(list)
 }
-
-def get_system_info():
-    """Get master system information"""
-    return {
-        'cpu_cores': psutil.cpu_count(),
-        'cpu_usage': psutil.cpu_percent(),
-        'memory_total': psutil.virtual_memory().total,
-        'memory_used': psutil.virtual_memory().used,
-        'memory_percent': psutil.virtual_memory().percent,
-        'platform': platform.system(),
-        'platform_version': platform.version()
-    }
 
 def cleanup_clients():
     """Background thread to clean up disconnected clients"""
@@ -97,11 +83,6 @@ def batch_detail(batch_id):
                          batch_id=batch_id,
                          batch_data=batch_data,
                          progress=progress)
-
-@app.route('/api/system_info')
-def get_system_info():
-    """Get master system information"""
-    return jsonify(get_system_info())
 
 # API Routes
 @app.route('/api/generate', methods=['POST'])
