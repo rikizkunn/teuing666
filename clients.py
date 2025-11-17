@@ -5,6 +5,8 @@ import threading
 import socket
 import os
 import sys
+import psutil
+import platform
 
 class Client:
     def __init__(self, server_url, client_name=None):
@@ -25,6 +27,23 @@ class Client:
         self.register()
         self.start_heartbeat()
     
+    def get_system_info(self):
+        """Get client system information"""
+        try:
+            return {
+                'cpu_cores': psutil.cpu_count(),
+                'cpu_usage': psutil.cpu_percent(),
+                'memory_total': psutil.virtual_memory().total,
+                'memory_used': psutil.virtual_memory().used,
+                'memory_percent': psutil.virtual_memory().percent,
+                'platform': platform.system(),
+                'platform_version': platform.version(),
+                'hostname': socket.gethostname()
+            }
+        except Exception as e:
+            print(f"Error getting system info: {e}")
+            return {}
+    
     def register(self):
         """Register with master server"""
         try:
@@ -32,7 +51,8 @@ class Client:
                 'client_id': self.client_id,
                 'capabilities': ['serial', 'parallel'],
                 'algorithms': list(self.algorithms.keys()),
-                'hostname': socket.gethostname()
+                'hostname': socket.gethostname(),
+                'system_info': self.get_system_info()
             }, timeout=5)
             print(f"Registered with master: {response.json()}")
         except Exception as e:

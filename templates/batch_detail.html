@@ -1,0 +1,107 @@
+<!-- templates/batch_detail.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch {{ batch_id }} - Data Details</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Batch Details</h1>
+                <p class="text-gray-600">{{ batch_id }}</p>
+            </div>
+            <a href="/" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition duration-200">
+                <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+            </a>
+        </div>
+
+        <!-- Batch Info -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                <i class="fas fa-info-circle mr-2 text-blue-500"></i>Batch Information
+            </h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Batch ID</label>
+                    <p class="text-sm text-gray-900 font-mono">{{ batch_id }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Data Size</label>
+                    <p class="text-sm text-gray-900">{{ batch_data.count }} numbers</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Algorithm</label>
+                    <p class="text-sm text-gray-900">{{ batch_data.algorithm }}</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Created</label>
+                    <p class="text-sm text-gray-900">{{ batch_data.created_at }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Unsorted Data -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                    <i class="fas fa-random mr-2 text-red-500"></i>Unsorted Data
+                    <span class="text-sm font-normal text-gray-600">({{ batch_data.count }} numbers)</span>
+                </h2>
+                <div class="bg-gray-50 p-4 rounded-md h-96 overflow-y-auto">
+                    <pre class="text-sm font-mono whitespace-pre-wrap">{{ batch_data.numbers | join(', ') }}</pre>
+                </div>
+            </div>
+
+            <!-- Sorted Data -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                    <i class="fas fa-sort-amount-down mr-2 text-green-500"></i>Sorted Data
+                    <span class="text-sm font-normal text-gray-600">({{ batch_data.count }} numbers)</span>
+                </h2>
+                <div class="bg-gray-50 p-4 rounded-md h-96 overflow-y-auto">
+                    {% if progress.final_result %}
+                    <pre class="text-sm font-mono whitespace-pre-wrap">{{ progress.final_result | join(', ') }}</pre> {% else %}
+                    <div class="text-center text-gray-500 py-16">
+                        <i class="fas fa-hourglass-half text-4xl mb-4"></i>
+                        <p>Data not sorted yet</p>
+                        <p class="text-sm mt-2">Start sorting from the dashboard</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Validation Info -->
+        {% if progress.final_result %}
+        <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                <i class="fas fa-check-circle mr-2 text-green-500"></i>Validation
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="text-center p-4 bg-green-50 rounded-lg">
+                    <div class="text-2xl font-bold text-green-600">{{ batch_data.count }}</div>
+                    <div class="text-sm text-green-800">Total Numbers</div>
+                </div>
+                <div class="text-center p-4 bg-blue-50 rounded-lg">
+                    <div class="text-2xl font-bold text-blue-600">{{ "%.3f"|format(progress.total_time) }}s</div>
+                    <div class="text-sm text-blue-800">Sorting Time</div>
+                </div>
+                <div class="text-center p-4 bg-purple-50 rounded-lg">
+                    <div class="text-2xl font-bold text-purple-600">{{ progress.mode|upper }}</div>
+                    <div class="text-sm text-purple-800">Sorting Mode</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+
+</html>

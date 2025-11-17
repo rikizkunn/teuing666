@@ -21,6 +21,31 @@
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
             <!-- Left Column -->
             <div class="xl:col-span-2 space-y-6">
+                <!-- System Information -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                        <i class="fas fa-server mr-2 text-blue-500"></i>System Information
+                    </h2>
+                    <div id="systemInfo" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="text-center p-3 bg-gray-50 rounded-lg">
+                            <div class="text-lg font-bold text-blue-600" id="cpuCores">-</div>
+                            <div class="text-xs text-gray-600">CPU Cores</div>
+                        </div>
+                        <div class="text-center p-3 bg-gray-50 rounded-lg">
+                            <div class="text-lg font-bold text-green-600" id="cpuUsage">-</div>
+                            <div class="text-xs text-gray-600">CPU Usage</div>
+                        </div>
+                        <div class="text-center p-3 bg-gray-50 rounded-lg">
+                            <div class="text-lg font-bold text-purple-600" id="memoryUsage">-</div>
+                            <div class="text-xs text-gray-600">Memory Usage</div>
+                        </div>
+                        <div class="text-center p-3 bg-gray-50 rounded-lg">
+                            <div class="text-lg font-bold text-orange-600" id="platform">-</div>
+                            <div class="text-xs text-gray-600">Platform</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Data Generation -->
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-xl font-semibold mb-4 text-gray-800">
@@ -48,37 +73,37 @@
                     </button>
                 </div>
 
-                <!-- Performance Stats -->
+                <!-- Latest Performance -->
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-xl font-semibold mb-4 text-gray-800">
-                        <i class="fas fa-trophy mr-2 text-yellow-500"></i>Performance Records
+                        <i class="fas fa-chart-line mr-2 text-green-500"></i>Latest Benchmarks
                     </h2>
 
                     <div class="grid grid-cols-2 gap-4">
-                        <!-- Fastest -->
-                        <div id="fastestRecord" class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <!-- Latest Serial -->
+                        <div id="latestSerial" class="bg-red-50 border border-red-200 rounded-lg p-4">
                             <div class="flex items-center mb-2">
-                                <i class="fas fa-bolt text-green-500 mr-2"></i>
-                                <span class="font-semibold text-green-800">Fastest</span>
+                                <i class="fas fa-sync text-red-500 mr-2"></i>
+                                <span class="font-semibold text-red-800">Latest Serial</span>
                             </div>
-                            <div id="fastestContent" class="text-sm text-gray-600">
+                            <div id="latestSerialContent" class="text-sm text-gray-600">
                                 <div class="text-center py-4">
                                     <i class="fas fa-clock text-2xl text-gray-300 mb-2"></i>
-                                    <p>No records yet</p>
+                                    <p>No serial tests yet</p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Slowest -->
-                        <div id="slowestRecord" class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <!-- Latest Parallel -->
+                        <div id="latestParallel" class="bg-green-50 border border-green-200 rounded-lg p-4">
                             <div class="flex items-center mb-2">
-                                <i class="fas fa-turtle text-red-500 mr-2"></i>
-                                <span class="font-semibold text-red-800">Slowest</span>
+                                <i class="fas fa-bolt text-green-500 mr-2"></i>
+                                <span class="font-semibold text-green-800">Latest Parallel</span>
                             </div>
-                            <div id="slowestContent" class="text-sm text-gray-600">
+                            <div id="latestParallelContent" class="text-sm text-gray-600">
                                 <div class="text-center py-4">
                                     <i class="fas fa-clock text-2xl text-gray-300 mb-2"></i>
-                                    <p>No records yet</p>
+                                    <p>No parallel tests yet</p>
                                 </div>
                             </div>
                         </div>
@@ -157,15 +182,39 @@
                     </div>
                 </div>
 
-                <!-- Benchmark Results -->
+                <!-- Performance Records -->
                 <div class="bg-white rounded-lg shadow-md p-6">
                     <h2 class="text-xl font-semibold mb-4 text-gray-800">
-                        <i class="fas fa-chart-bar mr-2 text-purple-500"></i>Recent Benchmarks
+                        <i class="fas fa-trophy mr-2 text-yellow-500"></i>Performance Records
                     </h2>
-                    <div id="benchmarkResults" class="space-y-3 max-h-80 overflow-y-auto">
-                        <div class="text-center text-gray-500 py-4">
-                            <i class="fas fa-chart-bar text-2xl mb-2"></i>
-                            <p>No benchmarks yet</p>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Fastest -->
+                        <div id="fastestRecord" class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <i class="fas fa-bolt text-green-500 mr-2"></i>
+                                <span class="font-semibold text-green-800">Fastest</span>
+                            </div>
+                            <div id="fastestContent" class="text-sm text-gray-600">
+                                <div class="text-center py-4">
+                                    <i class="fas fa-clock text-2xl text-gray-300 mb-2"></i>
+                                    <p>No records yet</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Slowest -->
+                        <div id="slowestRecord" class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <i class="fas fa-turtle text-red-500 mr-2"></i>
+                                <span class="font-semibold text-red-800">Slowest</span>
+                            </div>
+                            <div id="slowestContent" class="text-sm text-gray-600">
+                                <div class="text-center py-4">
+                                    <i class="fas fa-clock text-2xl text-gray-300 mb-2"></i>
+                                    <p>No records yet</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -189,6 +238,23 @@
                             <div id="sortedData" class="bg-gray-50 p-3 rounded-md h-32 overflow-y-auto text-sm font-mono">
                                 No data sorted
                             </div>
+                        </div>
+
+                        <div id="batchLink" class="text-center">
+                            <!-- Batch detail link will appear here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Benchmarks -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                        <i class="fas fa-chart-bar mr-2 text-purple-500"></i>Recent Benchmarks
+                    </h2>
+                    <div id="benchmarkResults" class="space-y-3 max-h-80 overflow-y-auto">
+                        <div class="text-center text-gray-500 py-4">
+                            <i class="fas fa-chart-bar text-2xl mb-2"></i>
+                            <p>No benchmarks yet</p>
                         </div>
                     </div>
                 </div>
@@ -229,6 +295,12 @@
 
                 document.getElementById('progressBar').style.width = '0%';
                 document.getElementById('progressText').textContent = '0/0 chunks';
+
+                // Show batch detail link
+                document.getElementById('batchLink').innerHTML =
+                    `<a href="/batch/${data.batch_id}" class="text-blue-500 hover:text-blue-700 text-sm">
+                        <i class="fas fa-external-link-alt mr-1"></i>View full data details
+                    </a>`;
             }
         }
 
@@ -298,6 +370,11 @@
 
         // Refresh progress
         async function refreshProgress() {
+            // Update system info
+            const systemResponse = await fetch('/api/system_info');
+            const systemData = await systemResponse.json();
+            updateSystemInfo(systemData);
+
             // Update clients
             const clientsResponse = await fetch('/api/clients');
             const clientsData = await clientsResponse.json();
@@ -317,6 +394,13 @@
             const benchmarksData = await benchmarksResponse.json();
             updateBenchmarks(benchmarksData.benchmarks);
             updatePerformanceStats(benchmarksData.performance_stats);
+        }
+
+        function updateSystemInfo(systemInfo) {
+            document.getElementById('cpuCores').textContent = systemInfo.cpu_cores || '-';
+            document.getElementById('cpuUsage').textContent = (systemInfo.cpu_usage || '0') + '%';
+            document.getElementById('memoryUsage').textContent = (systemInfo.memory_percent || '0') + '%';
+            document.getElementById('platform').textContent = systemInfo.platform || '-';
         }
 
         function updateClientsList(clients) {
@@ -343,15 +427,22 @@
                     client.status.startsWith('processing') ? 'bg-blue-100 text-blue-800' :
                     'bg-yellow-100 text-yellow-800';
 
+                const systemInfo = client.system_info || {};
+                const cpuCores = systemInfo.cpu_cores || '?';
+                const memory = systemInfo.memory_percent ? Math.round(systemInfo.memory_percent) + '%' : '?';
+
                 const clientEl = document.createElement('div');
-                clientEl.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-md';
+                clientEl.className = 'p-3 bg-gray-50 rounded-md';
                 clientEl.innerHTML = `
-                    <div class="flex-1">
+                    <div class="flex justify-between items-start mb-2">
                         <div class="font-medium">${client.id}</div>
-                        <div class="text-xs text-gray-600">${client.hostname}</div>
-                        <div class="text-xs text-gray-500 mt-1">${client.algorithms.join(', ')}</div>
+                        <span class="px-2 py-1 text-xs rounded-full ${statusColor}">${client.status}</span>
                     </div>
-                    <span class="px-2 py-1 text-xs rounded-full ${statusColor}">${client.status}</span>
+                    <div class="text-xs text-gray-600 space-y-1">
+                        <div>Host: ${client.hostname}</div>
+                        <div>CPU: ${cpuCores} cores | RAM: ${memory}</div>
+                        <div class="text-gray-500">${client.algorithms.join(', ')}</div>
+                    </div>
                 `;
                 container.appendChild(clientEl);
             });
@@ -422,7 +513,7 @@
             // Update sorted data if complete
             if (progress.is_complete && progress.final_result) {
                 document.getElementById('sortedData').textContent = 
-                    progress.final_result.join(', ');
+                    progress.final_result.slice(0, 20).join(', ');
                 
                 if (progress.total_time) {
                     document.getElementById('progressText').textContent += 
@@ -468,6 +559,40 @@
                             <div>${stats.slowest.total_numbers} numbers</div>
                             <div class="text-xs text-gray-500 mt-1">
                                 ${stats.slowest.clients_count} client(s)
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Update latest serial
+            const latestSerialContent = document.getElementById('latestSerialContent');
+            if (stats.latest_serial) {
+                latestSerialContent.innerHTML = `
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-red-600">${stats.latest_serial.total_time.toFixed(3)}s</div>
+                        <div class="text-sm mt-1">
+                            <div>${stats.latest_serial.algorithm}</div>
+                            <div>${stats.latest_serial.total_numbers} numbers</div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                1 client
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Update latest parallel
+            const latestParallelContent = document.getElementById('latestParallelContent');
+            if (stats.latest_parallel) {
+                latestParallelContent.innerHTML = `
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600">${stats.latest_parallel.total_time.toFixed(3)}s</div>
+                        <div class="text-sm mt-1">
+                            <div>${stats.latest_parallel.algorithm}</div>
+                            <div>${stats.latest_parallel.total_numbers} numbers</div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                ${stats.latest_parallel.clients_count} clients
                             </div>
                         </div>
                     </div>

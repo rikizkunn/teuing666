@@ -6,6 +6,8 @@ import json
 from collections import defaultdict
 from datetime import datetime
 import threading
+import psutil
+import platform
 
 app = Flask(__name__)
 
@@ -17,8 +19,22 @@ benchmark_results = []
 performance_stats = {
     'fastest': None,
     'slowest': None,
+    'latest_serial': None,
+    'latest_parallel': None,
     'average_times': defaultdict(list)
 }
+
+def get_system_info():
+    """Get master system information"""
+    return {
+        'cpu_cores': psutil.cpu_count(),
+        'cpu_usage': psutil.cpu_percent(),
+        'memory_total': psutil.virtual_memory().total,
+        'memory_used': psutil.virtual_memory().used,
+        'memory_percent': psutil.virtual_memory().percent,
+        'platform': platform.system(),
+        'platform_version': platform.version()
+    }
 
 def cleanup_clients():
     """Background thread to clean up disconnected clients"""
@@ -35,7 +51,7 @@ def cleanup_clients():
             del clients_connected[client_id]
 
 def update_performance_stats(benchmark):
-    """Update fastest/slowest performance stats"""
+    """Update performance stats including latest serial/parallel"""
     # Update fastest
     if (performance_stats['fastest'] is None or 
         benchmark['total_time'] < performance_stats['fastest']['total_time']):
@@ -45,6 +61,12 @@ def update_performance_stats(benchmark):
     if (performance_stats['slowest'] is None or 
         benchmark['total_time'] > performance_stats['slowest']['total_time']):
         performance_stats['slowest'] = benchmark
+    
+    # Update latest serial/parallel
+    if benchmark['mode'] == 'serial':
+        performance_stats['latest_serial'] = benchmark
+    elif benchmark['mode'] == 'parallel':
+        performance_stats['latest_parallel'] = benchmark
     
     # Update average times by mode and algorithm
     key = f"{benchmark['mode']}_{benchmark['algorithm']}"
@@ -61,6 +83,25 @@ cleanup_thread.start()
 @app.route('/')
 def home():
     return render_template('dashboard.html')
+
+@app.route('/batch/<batch_id>')
+def batch_detail(batch_id):
+    """Page showing full sorted and unsorted data"""
+    if batch_id not in batches:
+        return "Batch not found", 404
+    
+    batch_data = batches[batch_id]
+    progress = sorting_progress.get(batch_id, {})
+    
+    return render_template('batch_detail.html', 
+                         batch_id=batch_id,
+                         batch_data=batch_data,
+                         progress=progress)
+
+@app.route('/api/system_info')
+def get_system_info():
+    """Get master system information"""
+    return jsonify(get_system_info())
 
 # API Routes
 @app.route('/api/generate', methods=['POST'])
@@ -94,6 +135,7 @@ def register_client():
         'capabilities': data.get('capabilities', []),
         'algorithms': data.get('algorithms', ['quicksort']),
         'hostname': data.get('hostname', 'unknown'),
+        'system_info': data.get('system_info', {}),
         'last_seen': time.time(),
         'status': 'idle',
         'registered_at': datetime.now().isoformat()
@@ -151,7 +193,7 @@ def start_serial():
         'chunks': {
             0: {
                 'client_id': assigned_client,
-                'chunk_id': 0,  # Fixed: Add chunk_id here
+                'chunk_id': 0,
                 'status': 'assigned',
                 'size': len(batches[batch_id]['numbers']),
                 'processed_data': None,
@@ -206,7 +248,7 @@ def start_parallel():
         
         sorting_progress[batch_id]['chunks'][i] = {
             'client_id': client_id,
-            'chunk_id': i,  # Fixed: Add chunk_id here
+            'chunk_id': i,
             'status': 'assigned',
             'start_idx': start_idx,
             'end_idx': end_idx,
@@ -333,6 +375,32 @@ def get_benchmarks():
         'benchmarks': benchmark_results[-10:],
         'performance_stats': performance_stats
     })
+
+@app.route('/api/batch/<batch_id>')
+def get_batch_data(batch_id):
+    """Get full batch data for detail page"""
+    if batch_id not in batches:
+        return jsonify({'status': 'not_found'})
+    
+    batch_data = batches[batch_id]
+    progress = sorting_progress.get(batch_id, {})
+    
+    response = {
+        'batch_id': batch_id,
+        'numbers': batch_data['numbers'],
+        'count': batch_data['count'],
+        'algorithm': batch_data['algorithm'],
+        'created_at': batch_data['created_at']
+    }
+    
+    if progress.get('final_result'):
+        response['sorted_numbers'] = progress['final_result']
+        response['total_time'] = progress.get('total_time', 0)
+        response['is_complete'] = True
+    else:
+        response['is_complete'] = False
+    
+    return jsonify(response)
 
 @app.route('/api/batches')
 def get_batches():
