@@ -60,7 +60,7 @@ cleanup_thread.start()
 
 @app.route('/')
 def home():
-    return render_template('enhanced_dashboard.html')
+    return render_template('dashboard.html')
 
 # API Routes (same as before, but enhanced with performance tracking)
 @app.route('/api/generate', methods=['POST'])
