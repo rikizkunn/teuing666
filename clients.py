@@ -1,23 +1,26 @@
-# universal_client.py
+# enhanced_client_progress.py
 import requests
 import time
 import threading
 import socket
 import os
+import sys
 
-class UniversalClient:
+class EnhancedClient:
     def __init__(self, server_url, client_name=None):
         self.server_url = server_url
         self.client_id = client_name or f"{socket.gethostname()}_{os.getpid()}"
         self.algorithms = {
-            'quicksort': self.quick_sort,
-            'mergesort': self.merge_sort,
-            'bubblesort': self.bubble_sort
+            'quicksort': (self.quick_sort, True),
+            'mergesort': (self.merge_sort, True),
+            'bubblesort': (self.bubble_sort, False)  # bubblesort shows progress
         }
         self.running = True
         self.current_mode = None
+        self.current_algorithm = None
+        self.current_chunk_size = 0
         
-        print(f"🚀 Starting Universal Client: {self.client_id}")
+        print(f"🚀 Starting Enhanced Client: {self.client_id}")
         print(f"📋 Supported algorithms: {list(self.algorithms.keys())}")
         
         self.register()
@@ -37,7 +40,7 @@ class UniversalClient:
             print(f"❌ Registration failed: {e}")
     
     def start_heartbeat(self):
-        """Send heartbeat every 3 seconds to stay connected"""
+        """Send heartbeat every 3 seconds"""
         def heartbeat_loop():
             while self.running:
                 try:
@@ -45,10 +48,10 @@ class UniversalClient:
                                            json={'client_id': self.client_id},
                                            timeout=5)
                     if response.status_code == 200:
-                        print(f"♥ Heartbeat sent - Mode: {self.current_mode or 'idle'}")
-                    else:
-                        print("⚠ Heartbeat failed, re-registering...")
-                        self.register()
+                        status = f"Mode: {self.current_mode or 'idle'}"
+                        if self.current_algorithm:
+                            status += f" | Algorithm: {self.current_algorithm}"
+                        print(f"♥ Heartbeat - {status}")
                 except Exception as e:
                     print(f"💔 Heartbeat error: {e}")
                     self.register()
@@ -57,26 +60,94 @@ class UniversalClient:
         
         threading.Thread(target=heartbeat_loop, daemon=True).start()
     
+    def show_progress(self, current, total, algorithm):
+        """Show progress bar for sorting"""
+        if total == 0:
+            return
+        
+        percentage = (current / total) * 100
+        bar_length = 30
+        filled_length = int(bar_length * current // total)
+        bar = '█' * filled_length + '░' * (bar_length - filled_length)
+        
+        sys.stdout.write(f'\r🔄 {algorithm}: [{bar}] {percentage:.1f}% ({current}/{total})')
+        sys.stdout.flush()
+    
     def quick_sort(self, arr):
-        """Quick sort implementation"""
+        """Quick sort with progress tracking"""
         if len(arr) <= 1:
             return arr
+        
         pivot = arr[len(arr) // 2]
         left = [x for x in arr if x < pivot]
         middle = [x for x in arr if x == pivot]
         right = [x for x in arr if x > pivot]
-        return self.quick_sort(left) + middle + self.quick_sort(right)
+        
+        # Show progress for recursive calls
+        total_elements = len(left) + len(middle) + len(right)
+        sorted_left = self.quick_sort(left)
+        sorted_right = self.quick_sort(right)
+        
+        return sorted_left + middle + sorted_right
     
-    def merge_sort(self, arr):
-        """Merge sort implementation"""
+    def quick_sort_with_progress(self, arr, depth=0, max_depth=0):
+        """Quick sort with visual progress"""
         if len(arr) <= 1:
             return arr
         
-        mid = len(arr) // 2
-        left = self.merge_sort(arr[:mid])
-        right = self.merge_sort(arr[mid:])
+        if depth == 0:
+            max_depth = len(arr).bit_length()
+            print(f"\n🔍 Quick Sort started on {len(arr)} elements")
+            print(f"📊 Estimated depth: {max_depth} levels")
         
-        return self.merge(left, right)
+        pivot = arr[len(arr) // 2]
+        left = [x for x in arr if x < pivot]
+        middle = [x for x in arr if x == pivot]
+        right = [x for x in arr if x > pivot]
+        
+        # Show progress
+        progress = (depth / max_depth) * 100 if max_depth > 0 else 0
+        bar_length = 20
+        filled = int(bar_length * progress / 100)
+        bar = '█' * filled + '░' * (bar_length - filled)
+        print(f'\r🔄 Quick Sort: [{bar}] {progress:.1f}% | Depth: {depth}', end='')
+        
+        sorted_left = self.quick_sort_with_progress(left, depth + 1, max_depth)
+        sorted_right = self.quick_sort_with_progress(right, depth + 1, max_depth)
+        
+        if depth == 0:
+            print(f"\n✅ Quick Sort completed!")
+        
+        return sorted_left + middle + sorted_right
+    
+    def merge_sort(self, arr, level=0, max_level=0):
+        """Merge sort with progress tracking"""
+        if len(arr) <= 1:
+            return arr
+        
+        if level == 0:
+            max_level = len(arr).bit_length()
+            print(f"\n🔍 Merge Sort started on {len(arr)} elements")
+            print(f"📊 Estimated levels: {max_level}")
+        
+        mid = len(arr) // 2
+        left = self.merge_sort(arr[:mid], level + 1, max_level)
+        right = self.merge_sort(arr[mid:], level + 1, max_level)
+        
+        # Show progress
+        if max_level > 0:
+            progress = (level / max_level) * 100
+            bar_length = 20
+            filled = int(bar_length * progress / 100)
+            bar = '█' * filled + '░' * (bar_length - filled)
+            print(f'\r🔄 Merge Sort: [{bar}] {progress:.1f}% | Level: {level}', end='')
+        
+        result = self.merge(left, right)
+        
+        if level == 0:
+            print(f"\n✅ Merge Sort completed!")
+        
+        return result
     
     def merge(self, left, right):
         """Merge helper for merge sort"""
@@ -96,28 +167,51 @@ class UniversalClient:
         return result
     
     def bubble_sort(self, arr):
-        """Bubble sort implementation"""
+        """Bubble sort with detailed progress"""
         n = len(arr)
+        print(f"\n🔍 Bubble Sort started on {n} elements")
+        print(f"📊 Total passes needed: ~{n}")
+        
         for i in range(n):
+            swapped = False
+            
             for j in range(0, n - i - 1):
                 if arr[j] > arr[j + 1]:
                     arr[j], arr[j + 1] = arr[j + 1], arr[j]
+                    swapped = True
+            
+            # Show progress after each pass
+            progress = ((i + 1) / n) * 100
+            bar_length = 30
+            filled = int(bar_length * progress / 100)
+            bar = '█' * filled + '░' * (bar_length - filled)
+            
+            # Show some array samples to visualize sorting
+            sample_start = arr[:3] if len(arr) >= 3 else arr
+            sample_end = arr[-3:] if len(arr) >= 3 else []
+            
+            print(f'\r🔄 Bubble Sort: [{bar}] {progress:.1f}% | Pass {i+1}/{n} | Sample: {sample_start}...{sample_end}', end='')
+            
+            if not swapped:
+                break
+        
+        print(f"\n✅ Bubble Sort completed after {i+1} passes!")
         return arr
     
     def process_work(self):
-        """Main work loop - processes whatever work master assigns"""
+        """Main work loop with enhanced progress visualization"""
         print("🔄 Starting work processor...")
         
         while self.running:
             try:
-                # Get work from server
                 response = requests.get(f"{self.server_url}/api/get-work/{self.client_id}", timeout=10)
                 work = response.json()
                 
                 if work.get('status') == 'no_work':
                     if self.current_mode != 'idle':
-                        print("💤 No work available, waiting...")
+                        print("\n💤 No work available, waiting...")
                         self.current_mode = 'idle'
+                        self.current_algorithm = None
                     time.sleep(5)
                     continue
                 
@@ -128,15 +222,38 @@ class UniversalClient:
                 chunk_id = work.get('chunk_id', 0)
                 mode = work.get('mode', 'unknown')
                 
-                if mode != self.current_mode:
+                if mode != self.current_mode or algorithm != self.current_algorithm:
                     self.current_mode = mode
-                    print(f"🔄 Mode changed to: {mode.upper()}")
+                    self.current_algorithm = algorithm
+                    print(f"\n🎯 Mode changed to: {mode.upper()} | Algorithm: {algorithm}")
                 
-                print(f"⚡ Processing {mode} work - {len(data)} numbers using {algorithm}")
+                print(f"\n⚡ Starting {mode} work")
+                print(f"📦 Chunk {chunk_id} | {len(data)} numbers | Algorithm: {algorithm}")
+                print(f"📊 Data range: {min(data)} to {max(data)}")
                 
                 start_time = time.time()
-                sorted_data = self.algorithms[algorithm](data.copy())
+                
+                # Choose the appropriate sorting function
+                sort_func, _ = self.algorithms[algorithm]
+                
+                if algorithm == 'bubblesort':
+                    sorted_data = self.bubble_sort(data.copy())
+                elif algorithm == 'quicksort':
+                    sorted_data = self.quick_sort_with_progress(data.copy())
+                elif algorithm == 'mergesort':
+                    sorted_data = self.merge_sort(data.copy())
+                else:
+                    sorted_data = sort_func(data.copy())
+                
                 processing_time = time.time() - start_time
+                
+                # Verify sort
+                is_sorted = all(sorted_data[i] <= sorted_data[i+1] for i in range(len(sorted_data)-1))
+                status_emoji = "✅" if is_sorted else "❌"
+                
+                print(f"\n{status_emoji} Chunk {chunk_id} completed in {processing_time:.3f}s")
+                print(f"📈 Result: {len(sorted_data)} numbers | Sorted: {is_sorted}")
+                print(f"🔢 First 5: {sorted_data[:5]}... Last 5: {sorted_data[-5:]}")
                 
                 # Submit result
                 submit_response = requests.post(f"{self.server_url}/api/submit-work", json={
@@ -148,15 +265,19 @@ class UniversalClient:
                 }, timeout=10)
                 
                 if submit_response.status_code == 200:
-                    print(f"✅ Completed in {processing_time:.3f}s")
+                    print("📤 Result submitted successfully!")
                 else:
-                    print(f"❌ Submit failed")
+                    print("❌ Submit failed")
                 
             except requests.exceptions.Timeout:
                 print("⏰ Request timeout")
             except requests.exceptions.ConnectionError:
                 print("🔌 Connection error, retrying in 10s...")
                 time.sleep(10)
+            except KeyboardInterrupt:
+                print("\n🛑 Client stopping...")
+                self.stop()
+                break
             except Exception as e:
                 print(f"💥 Error: {e}")
                 time.sleep(5)
@@ -169,13 +290,13 @@ class UniversalClient:
 def main():
     import argparse
     
-    parser = argparse.ArgumentParser(description='Universal Sorting Client')
-    parser.add_argument('--server', default='http://localhost:5000', help='Master server URL')
+    parser = argparse.ArgumentParser(description='Enhanced Sorting Client with Progress Visualization')
+    parser.add_argument('--server', default='https://gdx1h4xsokf7.share.zrok.io/', help='Master server URL')
     parser.add_argument('--name', help='Custom client name')
     
     args = parser.parse_args()
     
-    client = UniversalClient(args.server, args.name)
+    client = EnhancedClient(args.server, args.name)
     
     try:
         client.process_work()
