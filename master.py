@@ -1,4 +1,4 @@
-# enhanced_master_benchmarks.py
+# master.py
 from flask import Flask, render_template, jsonify, request
 import random
 import time
@@ -62,7 +62,7 @@ cleanup_thread.start()
 def home():
     return render_template('dashboard.html')
 
-# API Routes (same as before, but enhanced with performance tracking)
+# API Routes
 @app.route('/api/generate', methods=['POST'])
 def generate_numbers():
     data = request.json
@@ -99,7 +99,7 @@ def register_client():
         'registered_at': datetime.now().isoformat()
     }
     
-    print(f"✅ Client registered: {client_id}")
+    print(f"Client registered: {client_id}")
     return jsonify({'status': 'registered'})
 
 @app.route('/api/heartbeat', methods=['POST'])
@@ -151,6 +151,7 @@ def start_serial():
         'chunks': {
             0: {
                 'client_id': assigned_client,
+                'chunk_id': 0,  # Fixed: Add chunk_id here
                 'status': 'assigned',
                 'size': len(batches[batch_id]['numbers']),
                 'processed_data': None,
@@ -205,6 +206,7 @@ def start_parallel():
         
         sorting_progress[batch_id]['chunks'][i] = {
             'client_id': client_id,
+            'chunk_id': i,  # Fixed: Add chunk_id here
             'status': 'assigned',
             'start_idx': start_idx,
             'end_idx': end_idx,
@@ -297,6 +299,7 @@ def submit_work():
             
             benchmark_results.append(benchmark)
             update_performance_stats(benchmark)
+            print(f"Benchmark saved: {benchmark['mode']} {benchmark['algorithm']} - {benchmark['total_time']:.3f}s")
     
     return jsonify({'status': 'success'})
 
@@ -346,5 +349,5 @@ def get_batches():
     return jsonify({'batches': batch_list})
 
 if __name__ == '__main__':
-    print("🚀 Starting Enhanced Master Server...")
+    print("Starting Master Server...")
     app.run(host='0.0.0.0', port=5000, debug=True)
