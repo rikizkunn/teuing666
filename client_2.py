@@ -1,21 +1,27 @@
-# simple_computer2.py
+# enhanced_computer3.py
 import requests
 import time
-import threading
 
-class SimpleClient:
+class ParallelClient:
     def __init__(self, server_url, client_id):
         self.server_url = server_url
         self.client_id = client_id
+        self.algorithms = {
+            'quicksort': self.quick_sort,
+            'mergesort': self.merge_sort
+        }
         self.register()
     
     def register(self):
-        """Register with master server"""
-        response = requests.get(f"{self.server_url}/register/{self.client_id}")
+        """Register as parallel-only client"""
+        response = requests.post(f"{self.server_url}/api/register", json={
+            'client_id': self.client_id,
+            'capabilities': ['parallel'],
+            'algorithms': list(self.algorithms.keys())
+        })
         print(f"Registered: {response.json()}")
     
     def quick_sort(self, arr):
-        """Simple quick sort"""
         if len(arr) <= 1:
             return arr
         pivot = arr[len(arr) // 2]
@@ -24,77 +30,77 @@ class SimpleClient:
         right = [x for x in arr if x > pivot]
         return self.quick_sort(left) + middle + self.quick_sort(right)
     
-    def process_serial(self):
-        """Process all work serially"""
-        print("Starting SERIAL processing...")
+    def merge_sort(self, arr):
+        if len(arr) <= 1:
+            return arr
+        
+        mid = len(arr) // 2
+        left = self.merge_sort(arr[:mid])
+        right = self.merge_sort(arr[mid:])
+        
+        return self.merge(left, right)
+    
+    def merge(self, left, right):
+        result = []
+        i = j = 0
+        
+        while i < len(left) and j < len(right):
+            if left[i] < right[j]:
+                result.append(left[i])
+                i += 1
+            else:
+                result.append(right[j])
+                j += 1
+        
+        result.extend(left[i:])
+        result.extend(right[j:])
+        return result
+    
+    def start_worker(self):
+        """Continuous parallel worker"""
+        print("Parallel worker started...")
         
         while True:
-            # Get work from server
-            response = requests.get(f"{self.server_url}/get_work/{self.client_id}")
-            work = response.json()
-            
-            if work.get('status') == 'no_work':
-                print("No more work available")
-                break
-            
-            # Process the chunk
-            chunk = work['chunk']
-            batch_id = work['batch_id']
-            
-            print(f"Processing chunk {work['chunk_index']} with {len(chunk)} numbers")
-            
-            start_time = time.time()
-            sorted_chunk = self.quick_sort(chunk)
-            process_time = time.time() - start_time
-            
-            # Submit result
-            requests.post(f"{self.server_url}/submit", json={
-                'batch_id': batch_id,
-                'client_id': self.client_id,
-                'sorted_chunk': sorted_chunk,
-                'chunk_index': work['chunk_index'],
-                'process_time': process_time
-            })
-            
-            print(f"Chunk {work['chunk_index']} sorted in {process_time:.3f}s")
-    
-    def process_parallel(self):
-        """Process work in parallel mode"""
-        print("Starting PARALLEL processing...")
-        self.process_serial()  # Same logic, but server distributes work
-    
-    def auto_mode(self):
-        """Automatically switch between modes based on server"""
-        while True:
-            # Check available clients
-            response = requests.get(f"{self.server_url}/clients")
-            clients = response.json()['clients']
-            
-            if len(clients) > 1:
-                print(f"Parallel mode available with {len(clients)} clients")
-                self.process_parallel()
-            else:
-                print("Serial mode - only one client")
-                self.process_serial()
-            
-            time.sleep(5)  # Wait before checking again
+            try:
+                # Get work from server
+                response = requests.get(f"{self.server_url}/api/get-work/{self.client_id}")
+                work = response.json()
+                
+                if work.get('status') == 'no_work':
+                    time.sleep(2)
+                    continue
+                
+                # Process the chunk
+                data = work['data']
+                algorithm = work['algorithm']
+                batch_id = work['batch_id']
+                chunk_id = work['chunk_id']
+                
+                print(f"Processing chunk {chunk_id} with {len(data)} numbers using {algorithm}")
+                
+                start_time = time.time()
+                sorted_data = self.algorithms[algorithm](data.copy())
+                processing_time = time.time() - start_time
+                
+                # Submit result
+                requests.post(f"{self.server_url}/api/submit-work", json={
+                    'batch_id': batch_id,
+                    'client_id': self.client_id,
+                    'processed_data': sorted_data,
+                    'processing_time': processing_time,
+                    'chunk_id': chunk_id
+                })
+                
+                print(f"Chunk {chunk_id} completed in {processing_time:.3f}s")
+                
+            except Exception as e:
+                print(f"Error: {e}")
+                time.sleep(5)
 
 def main():
-    server_url = "http://192.168.1.100:5000"  # Change to your server IP
-    client = SimpleClient(server_url, "computer2")
-    
-    print("1. Serial Mode")
-    print("2. Parallel Mode") 
-    print("3. Auto Mode (detect)")
-    
-    choice = input("Choose mode: ")
-    
-    if choice == '1':
-        client.process_serial()
-    elif choice == '2':
-        client.process_parallel()
-    elif choice == '3':
-        client.auto_mode()
+    server_url = "https://gdx1h4xsokf7.share.zrok.io"  # Change to your server IP
+    client = ParallelClient(server_url, "computer3")
+    client.start_worker()
 
 if __name__ == '__main__':
     main()

@@ -1,0 +1,397 @@
+<!-- templates/dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parallel Sorting Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Parallel Sorting Benchmark</h1>
+            <p class="text-gray-600">Compare serial vs parallel sorting performance across multiple computers</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Left Column -->
+            <div class="space-y-6">
+                <!-- Data Generation Card -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                        <i class="fas fa-database mr-2 text-blue-500"></i>Data Generation
+                    </h2>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Data Size</label>
+                            <input type="number" id="dataSize" value="10000" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Sorting Algorithm</label>
+                            <select id="algorithm" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="quicksort">Quick Sort</option>
+                                <option value="mergesort">Merge Sort</option>
+                                <option value="bubblesort">Bubble Sort</option>
+                            </select>
+                        </div>
+
+                        <button onclick="generateData()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition duration-200">
+                            <i class="fas fa-plus-circle mr-2"></i>Generate Random Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Connected Clients Card -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                        <i class="fas fa-desktop mr-2 text-green-500"></i>Connected Clients
+                    </h2>
+                    <div id="clientsList" class="space-y-3">
+                        <!-- Clients will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Benchmark Results Card -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                        <i class="fas fa-chart-bar mr-2 text-purple-500"></i>Benchmark Results
+                    </h2>
+                    <div id="benchmarkResults" class="space-y-3">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="space-y-6">
+                <!-- Control Panel -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                        <i class="fas fa-play-circle mr-2 text-red-500"></i>Control Panel
+                    </h2>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <button onclick="startSerial()" id="serialBtn" class="bg-red-500 hover:bg-red-600 text-white font-medium py-3 px-4 rounded-md transition duration-200">
+                            <i class="fas fa-sync mr-2"></i>Start Serial
+                        </button>
+
+                        <button onclick="startParallel()" id="parallelBtn" class="bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-md transition duration-200">
+                            <i class="fas fa-bolt mr-2"></i>Start Parallel
+                        </button>
+                    </div>
+
+                    <div id="currentBatch" class="text-sm text-gray-600 p-3 bg-gray-50 rounded-md">
+                        No active batch
+                    </div>
+                </div>
+
+                <!-- Progress Visualization -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                        <i class="fas fa-tasks mr-2 text-orange-500"></i>Sorting Progress
+                    </h2>
+
+                    <div id="progressSection">
+                        <div class="mb-4">
+                            <div class="flex justify-between text-sm text-gray-600 mb-1">
+                                <span>Progress</span>
+                                <span id="progressText">0/0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-3">
+                                <div id="progressBar" class="bg-blue-500 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div id="chunkGrid" class="grid grid-cols-5 gap-2 mb-4">
+                            <!-- Chunk indicators will appear here -->
+                        </div>
+
+                        <div id="clientAssignments" class="space-y-2">
+                            <!-- Client assignments will appear here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Preview -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-800">
+                        <i class="fas fa-eye mr-2 text-indigo-500"></i>Data Preview
+                    </h2>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <h3 class="font-medium text-gray-700 mb-2">Unsorted Data (First 50)</h3>
+                            <div id="unsortedData" class="bg-gray-50 p-3 rounded-md h-40 overflow-y-auto text-sm font-mono">
+                                No data generated
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="font-medium text-gray-700 mb-2">Sorted Data (First 50)</h3>
+                            <div id="sortedData" class="bg-gray-50 p-3 rounded-md h-40 overflow-y-auto text-sm font-mono">
+                                No data sorted
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentBatchId = null;
+        let refreshInterval = null;
+
+        // Generate random data
+        async function generateData() {
+            const count = document.getElementById('dataSize').value;
+            const algorithm = document.getElementById('algorithm').value;
+
+            const response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    count: parseInt(count),
+                    algorithm
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                currentBatchId = data.batch_id;
+                document.getElementById('currentBatch').innerHTML =
+                    `<strong>Current Batch:</strong> ${data.batch_id} (${data.count} numbers)`;
+
+                // Show unsorted data
+                document.getElementById('unsortedData').textContent =
+                    data.sample_data.join(', ');
+
+                // Clear sorted data
+                document.getElementById('sortedData').textContent = 'No data sorted';
+
+                // Reset progress
+                document.getElementById('progressBar').style.width = '0%';
+                document.getElementById('progressText').textContent = '0/0';
+            }
+        }
+
+        // Start serial sorting
+        async function startSerial() {
+            if (!currentBatchId) {
+                alert('Please generate data first');
+                return;
+            }
+
+            const algorithm = document.getElementById('algorithm').value;
+            const response = await fetch('/api/start-serial', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    batch_id: currentBatchId,
+                    algorithm
+                })
+            });
+
+            const data = await response.json();
+            if (data.status === 'started') {
+                alert(`Serial sort started on ${data.assigned_client}`);
+                startProgressRefresh();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        }
+
+        // Start parallel sorting
+        async function startParallel() {
+            if (!currentBatchId) {
+                alert('Please generate data first');
+                return;
+            }
+
+            const algorithm = document.getElementById('algorithm').value;
+            const response = await fetch('/api/start-parallel', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    batch_id: currentBatchId,
+                    algorithm
+                })
+            });
+
+            const data = await response.json();
+            if (data.status === 'started') {
+                alert(`Parallel sort started with ${data.total_clients} clients`);
+                startProgressRefresh();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        }
+
+        // Refresh progress
+        async function refreshProgress() {
+            if (!currentBatchId) return;
+
+            // Update clients
+            const clientsResponse = await fetch('/api/clients');
+            const clientsData = await clientsResponse.json();
+            updateClientsList(clientsData.clients);
+
+            // Update progress
+            const progressResponse = await fetch('/api/progress/' + currentBatchId);
+            if (progressResponse.status === 200) {
+                const progress = await progressResponse.json();
+                updateProgressDisplay(progress);
+            }
+
+            // Update benchmarks
+            const benchmarksResponse = await fetch('/api/benchmarks');
+            const benchmarksData = await benchmarksResponse.json();
+            updateBenchmarks(benchmarksData.benchmarks);
+        }
+
+        function updateClientsList(clients) {
+            const container = document.getElementById('clientsList');
+            container.innerHTML = '';
+
+            Object.values(clients).forEach(client => {
+                const statusColor = client.status === 'idle' ? 'bg-green-100 text-green-800' :
+                    client.status.startsWith('processing') ? 'bg-blue-100 text-blue-800' :
+                    'bg-gray-100 text-gray-800';
+
+                const clientEl = document.createElement('div');
+                clientEl.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-md';
+                clientEl.innerHTML = `
+                    <div>
+                        <div class="font-medium">${client.id}</div>
+                        <div class="text-sm text-gray-600">${client.algorithms.join(', ')}</div>
+                    </div>
+                    <span class="px-2 py-1 text-xs rounded-full ${statusColor}">${client.status}</span>
+                `;
+                container.appendChild(clientEl);
+            });
+        }
+
+        function updateProgressDisplay(progress) {
+            if (progress.status === 'not_found') return;
+
+            const percent = (progress.completed_chunks / progress.total_chunks) * 100;
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('progressText').textContent =
+                `${progress.completed_chunks}/${progress.total_chunks}`;
+
+            // Update chunk grid
+            const chunkGrid = document.getElementById('chunkGrid');
+            chunkGrid.innerHTML = '';
+
+            for (let i = 0; i < progress.total_chunks; i++) {
+                const chunk = document.createElement('div');
+                const chunkInfo = progress.chunks[i];
+                const isCompleted = chunkInfo && chunkInfo.status === 'completed';
+
+                chunk.className = `h-8 rounded-md flex items-center justify-center text-white text-xs font-medium ${
+                    isCompleted ? 'bg-green-500' : 'bg-gray-300'
+                }`;
+                chunk.textContent = i + 1;
+
+                if (chunkInfo) {
+                    chunk.title = `Client: ${chunkInfo.client_id}\nStatus: ${chunkInfo.status}`;
+                }
+
+                chunkGrid.appendChild(chunk);
+            }
+
+            // Update client assignments
+            const assignments = document.getElementById('clientAssignments');
+            assignments.innerHTML = '';
+
+            if (progress.mode === 'serial' && progress.assigned_client) {
+                assignments.innerHTML = `
+                    <div class="text-sm text-gray-700">
+                        <i class="fas fa-user mr-1"></i> Serial processing by: <strong>${progress.assigned_client}</strong>
+                    </div>
+                `;
+            } else if (progress.mode === 'parallel') {
+                Object.values(progress.chunks).forEach(chunk => {
+                    const assignment = document.createElement('div');
+                    assignment.className = 'text-sm text-gray-700';
+                    assignment.innerHTML = `
+                        <i class="fas fa-cube mr-1"></i> Chunk ${chunk.chunk_id}: 
+                        <strong>${chunk.client_id}</strong> 
+                        <span class="text-xs ${chunk.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}">
+                            (${chunk.status})
+                        </span>
+                    `;
+                    assignments.appendChild(assignment);
+                });
+            }
+
+            // Update sorted data if complete
+            if (progress.is_complete && progress.final_result) {
+                document.getElementById('sortedData').textContent =
+                    progress.final_result.join(', ');
+
+                if (progress.total_time) {
+                    document.getElementById('progressText').textContent +=
+                        ` | Time: ${progress.total_time.toFixed(3)}s`;
+                }
+            }
+        }
+
+        function updateBenchmarks(benchmarks) {
+            const container = document.getElementById('benchmarkResults');
+            container.innerHTML = '';
+
+            benchmarks.reverse().forEach(benchmark => {
+                const benchmarkEl = document.createElement('div');
+                benchmarkEl.className = 'p-3 bg-gray-50 rounded-md border-l-4 ' +
+                    (benchmark.mode === 'serial' ? 'border-red-400' : 'border-green-400');
+
+                benchmarkEl.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="font-medium">${benchmark.mode.toUpperCase()}</div>
+                            <div class="text-sm text-gray-600">
+                                ${benchmark.total_numbers} numbers | ${benchmark.algorithm}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-bold text-lg">${benchmark.total_time?.toFixed(3)}s</div>
+                            <div class="text-xs text-gray-500">
+                                ${new Date(benchmark.timestamp).toLocaleTimeString()}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-600 mt-2">
+                        Clients: ${Array.isArray(benchmark.clients_used) ? 
+                          benchmark.clients_used.join(', ') : benchmark.client_used}
+                    </div>
+                `;
+                container.appendChild(benchmarkEl);
+            });
+        }
+
+        function startProgressRefresh() {
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(refreshProgress, 1000);
+        }
+
+        // Initialize
+        startProgressRefresh();
+    </script>
+</body>
+
+</html>

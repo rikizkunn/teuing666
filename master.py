@@ -1,172 +1,320 @@
-# simple_master.py
-from flask import Flask, jsonify, request
+# enhanced_master.py
+from flask import Flask, render_template, jsonify, request
 import random
 import time
-import threading
+import json
 from collections import defaultdict
+from datetime import datetime
 
 app = Flask(__name__)
 
-# Store data in memory (simple approach)
+# Storage
 batches = {}
-clients_connected = set()
+clients_connected = {}
 sorting_progress = defaultdict(dict)
+benchmark_results = []
 
 @app.route('/')
 def home():
-    return """
-    <h1>Simple Parallel Sorting Server</h1>
-    <button onclick="generateNumbers()">Generate 10,000 Numbers</button>
-    <button onclick="startSerial()">Start Serial Sort</button>
-    <button onclick="startParallel()">Start Parallel Sort</button>
-    <div id="status"></div>
-    <div id="progress"></div>
-    <script>
-        async function generateNumbers() {
-            const response = await fetch('/generate/10000');
-            const data = await response.json();
-            document.getElementById('status').innerHTML = 'Generated: ' + data.batch_id;
-        }
-        
-        async function startSerial() {
-            const response = await fetch('/start/serial');
-            const data = await response.json();
-            document.getElementById('status').innerHTML = 'Started serial sort';
-        }
-        
-        async function startParallel() {
-            const response = await fetch('/start/parallel');
-            const data = await response.json();
-            document.getElementById('status').innerHTML = 'Started parallel sort';
-        }
-        
-        // Check progress every second
-        setInterval(async () => {
-            const response = await fetch('/progress');
-            const data = await response.json();
-            document.getElementById('progress').innerHTML = 
-                'Completed: ' + data.completed + '/' + data.total;
-        }, 1000);
-    </script>
-    """
+    return render_template('dashboard.html')
 
-@app.route('/generate/<int:count>')
-def generate_numbers(count):
-    """Generate random numbers and store in memory"""
+# API Routes
+@app.route('/api/generate', methods=['POST'])
+def generate_numbers():
+    """Generate random numbers with custom size"""
+    data = request.json
+    count = data.get('count', 10000)
     batch_id = f"batch_{int(time.time())}"
     
-    # Generate random numbers
     numbers = [random.randint(1, 1000000) for _ in range(count)]
-    batches[batch_id] = numbers
+    batches[batch_id] = {
+        'numbers': numbers,
+        'count': count,
+        'created_at': datetime.now().isoformat(),
+        'algorithm': data.get('algorithm', 'quicksort')
+    }
     
     return jsonify({
         'status': 'success',
         'batch_id': batch_id,
-        'count': count
+        'count': count,
+        'sample_data': numbers[:50]  # First 50 numbers for display
     })
 
-@app.route('/register/<client_id>')
-def register_client(client_id):
-    """Register a client computer"""
-    clients_connected.add(client_id)
-    return jsonify({'status': 'registered', 'client_id': client_id})
+@app.route('/api/register', methods=['POST'])
+def register_client():
+    """Register client with capabilities"""
+    data = request.json
+    client_id = data['client_id']
+    
+    clients_connected[client_id] = {
+        'id': client_id,
+        'capabilities': data.get('capabilities', []),
+        'algorithms': data.get('algorithms', ['quicksort']),
+        'last_seen': time.time(),
+        'status': 'idle'
+    }
+    
+    return jsonify({'status': 'registered'})
 
-@app.route('/clients')
-def list_clients():
-    """List connected clients"""
-    return jsonify({'clients': list(clients_connected)})
+@app.route('/api/clients')
+def get_clients():
+    """Get connected clients"""
+    # Clean up disconnected clients
+    current_time = time.time()
+    disconnected = []
+    for client_id, client in clients_connected.items():
+        if current_time - client['last_seen'] > 10:  # 10 seconds timeout
+            disconnected.append(client_id)
+    
+    for client_id in disconnected:
+        del clients_connected[client_id]
+    
+    return jsonify({'clients': clients_connected})
 
-@app.route('/get_work/<client_id>')
+@app.route('/api/start-serial', methods=['POST'])
+def start_serial():
+    """Start serial sorting using only one computer"""
+    data = request.json
+    batch_id = data['batch_id']
+    algorithm = data.get('algorithm', 'quicksort')
+    
+    if batch_id not in batches:
+        return jsonify({'status': 'error', 'message': 'Batch not found'})
+    
+    # Reset progress
+    sorting_progress[batch_id] = {
+        'mode': 'serial',
+        'algorithm': algorithm,
+        'start_time': time.time(),
+        'completed_chunks': 0,
+        'total_chunks': 1,  # Serial processes everything as one chunk
+        'chunks': {},
+        'assigned_client': None
+    }
+    
+    # Find a capable client
+    capable_clients = [
+        client_id for client_id, client in clients_connected.items()
+        if algorithm in client.get('algorithms', [])
+    ]
+    
+    if not capable_clients:
+        return jsonify({'status': 'error', 'message': 'No capable clients available'})
+    
+    # Use the first capable client
+    assigned_client = capable_clients[0]
+    sorting_progress[batch_id]['assigned_client'] = assigned_client
+    clients_connected[assigned_client]['status'] = 'processing_serial'
+    
+    return jsonify({
+        'status': 'started',
+        'assigned_client': assigned_client,
+        'total_numbers': len(batches[batch_id]['numbers'])
+    })
+
+@app.route('/api/start-parallel', methods=['POST'])
+def start_parallel():
+    """Start parallel sorting using all computers"""
+    data = request.json
+    batch_id = data['batch_id']
+    algorithm = data.get('algorithm', 'quicksort')
+    
+    if batch_id not in batches:
+        return jsonify({'status': 'error', 'message': 'Batch not found'})
+    
+    # Get capable clients
+    capable_clients = [
+        client_id for client_id, client in clients_connected.items()
+        if algorithm in client.get('algorithms', [])
+    ]
+    
+    if not capable_clients:
+        return jsonify({'status': 'error', 'message': 'No capable clients available'})
+    
+    # Calculate chunks - split data equally among clients
+    numbers = batches[batch_id]['numbers']
+    total_numbers = len(numbers)
+    chunk_size = total_numbers // len(capable_clients)
+    
+    # Reset progress
+    sorting_progress[batch_id] = {
+        'mode': 'parallel',
+        'algorithm': algorithm,
+        'start_time': time.time(),
+        'completed_chunks': 0,
+        'total_chunks': len(capable_clients),
+        'chunks': {},
+        'assigned_clients': capable_clients
+    }
+    
+    # Prepare chunks
+    chunks = []
+    for i, client_id in enumerate(capable_clients):
+        start_idx = i * chunk_size
+        end_idx = start_idx + chunk_size if i < len(capable_clients) - 1 else total_numbers
+        chunk_data = numbers[start_idx:end_idx]
+        
+        sorting_progress[batch_id]['chunks'][i] = {
+            'client_id': client_id,
+            'status': 'assigned',
+            'start_idx': start_idx,
+            'end_idx': end_idx,
+            'size': len(chunk_data),
+            'processed_data': None,
+            'processing_time': None
+        }
+        
+        clients_connected[client_id]['status'] = f'processing_chunk_{i}'
+    
+    return jsonify({
+        'status': 'started',
+        'total_clients': len(capable_clients),
+        'chunk_size': chunk_size,
+        'total_numbers': total_numbers
+    })
+
+@app.route('/api/get-work/<client_id>')
 def get_work(client_id):
-    """Get work for a client"""
-    # Find a batch that needs processing
-    for batch_id, numbers in batches.items():
-        if f'{batch_id}_completed' in sorting_progress:
-            continue
-            
-        if f'{batch_id}_assigned_to_{client_id}' not in sorting_progress:
-            # Calculate chunks based on number of connected clients
-            total_clients = len(clients_connected)
-            total_numbers = len(numbers)
-            chunk_size = total_numbers // total_clients
-            
-            # Assign chunk to this client
-            client_index = sorted(clients_connected).index(client_id)
-            start_index = client_index * chunk_size
-            end_index = start_index + chunk_size if client_index < total_clients - 1 else total_numbers
-            
-            chunk = numbers[start_index:end_index]
-            
-            # Mark as assigned
-            sorting_progress[f'{batch_id}_assigned_to_{client_id}'] = True
-            
-            return jsonify({
-                'batch_id': batch_id,
-                'chunk': chunk,
-                'chunk_index': client_index,
-                'total_chunks': total_clients
-            })
+    """Get assigned work for client"""
+    for batch_id, progress in sorting_progress.items():
+        if progress['mode'] == 'serial' and progress['assigned_client'] == client_id:
+            if progress['completed_chunks'] == 0:  # Not started
+                return jsonify({
+                    'batch_id': batch_id,
+                    'mode': 'serial',
+                    'algorithm': progress['algorithm'],
+                    'data': batches[batch_id]['numbers'],
+                    'chunk_id': 0
+                })
+        
+        elif progress['mode'] == 'parallel':
+            for chunk_id, chunk_info in progress['chunks'].items():
+                if chunk_info['client_id'] == client_id and chunk_info['status'] == 'assigned':
+                    chunk_data = batches[batch_id]['numbers'][chunk_info['start_idx']:chunk_info['end_idx']]
+                    return jsonify({
+                        'batch_id': batch_id,
+                        'mode': 'parallel',
+                        'algorithm': progress['algorithm'],
+                        'data': chunk_data,
+                        'chunk_id': chunk_id,
+                        'start_idx': chunk_info['start_idx'],
+                        'end_idx': chunk_info['end_idx']
+                    })
     
     return jsonify({'status': 'no_work'})
 
-@app.route('/submit', methods=['POST'])
+@app.route('/api/submit-work', methods=['POST'])
 def submit_work():
-    """Receive sorted work from client"""
+    """Receive processed work from client"""
     data = request.json
     batch_id = data['batch_id']
     client_id = data['client_id']
-    sorted_chunk = data['sorted_chunk']
-    chunk_index = data['chunk_index']
+    processed_data = data['processed_data']
+    processing_time = data['processing_time']
+    chunk_id = data.get('chunk_id', 0)
     
-    # Store the sorted chunk
-    if f'{batch_id}_results' not in sorting_progress:
-        sorting_progress[f'{batch_id}_results'] = []
+    if batch_id not in sorting_progress:
+        return jsonify({'status': 'error', 'message': 'Batch not found'})
     
-    sorting_progress[f'{batch_id}_results'].append({
-        'chunk_index': chunk_index,
-        'data': sorted_chunk,
-        'client_id': client_id
-    })
+    progress = sorting_progress[batch_id]
     
-    # Check if all chunks are done
-    total_clients = len(clients_connected)
-    completed_chunks = len(sorting_progress[f'{batch_id}_results'])
-    
-    if completed_chunks >= total_clients:
-        # Combine all sorted chunks
-        all_chunks = sorting_progress[f'{batch_id}_results']
-        all_chunks.sort(key=lambda x: x['chunk_index'])
+    if progress['mode'] == 'serial':
+        progress['completed_chunks'] = 1
+        progress['final_result'] = processed_data
+        progress['total_time'] = time.time() - progress['start_time']
+        progress['processing_time'] = processing_time
         
-        final_sorted = []
-        for chunk in all_chunks:
-            final_sorted.extend(chunk['data'])
-        
-        sorting_progress[f'{batch_id}_completed'] = final_sorted
-        return jsonify({'status': 'batch_complete'})
+        # Save benchmark
+        benchmark_results.append({
+            'batch_id': batch_id,
+            'mode': 'serial',
+            'algorithm': progress['algorithm'],
+            'total_numbers': len(processed_data),
+            'total_time': progress['total_time'],
+            'processing_time': processing_time,
+            'client_used': client_id,
+            'timestamp': datetime.now().isoformat()
+        })
     
-    return jsonify({'status': 'chunk_received'})
+    elif progress['mode'] == 'parallel':
+        if chunk_id in progress['chunks']:
+            progress['chunks'][chunk_id]['status'] = 'completed'
+            progress['chunks'][chunk_id]['processed_data'] = processed_data
+            progress['chunks'][chunk_id]['processing_time'] = processing_time
+            progress['completed_chunks'] += 1
+            
+            # Update client status
+            clients_connected[client_id]['status'] = 'idle'
+            
+            # If all chunks completed, combine results
+            if progress['completed_chunks'] >= progress['total_chunks']:
+                # Combine all sorted chunks (they should be sorted individually)
+                all_chunks = []
+                for chunk_info in progress['chunks'].values():
+                    all_chunks.extend(chunk_info['processed_data'])
+                
+                # Final sort to combine chunks (optional - chunks should already be sorted)
+                all_chunks.sort()
+                progress['final_result'] = all_chunks
+                progress['total_time'] = time.time() - progress['start_time']
+                
+                # Save benchmark
+                benchmark_results.append({
+                    'batch_id': batch_id,
+                    'mode': 'parallel',
+                    'algorithm': progress['algorithm'],
+                    'total_numbers': len(all_chunks),
+                    'total_time': progress['total_time'],
+                    'clients_used': list(set(chunk['client_id'] for chunk in progress['chunks'].values())),
+                    'timestamp': datetime.now().isoformat()
+                })
+    
+    return jsonify({'status': 'success'})
 
-@app.route('/start/<mode>')
-def start_sort(mode):
-    """Start sorting in specified mode"""
-    # For demo, we'll just reset progress
-    for key in list(sorting_progress.keys()):
-        if key.endswith('_assigned_to_') or key.endswith('_results'):
-            del sorting_progress[key]
+@app.route('/api/progress/<batch_id>')
+def get_progress(batch_id):
+    """Get sorting progress for a batch"""
+    if batch_id not in sorting_progress:
+        return jsonify({'status': 'not_found'})
     
-    return jsonify({'status': f'started_{mode}', 'clients': len(clients_connected)})
+    progress = sorting_progress[batch_id]
+    
+    response = {
+        'batch_id': batch_id,
+        'mode': progress['mode'],
+        'algorithm': progress['algorithm'],
+        'completed_chunks': progress['completed_chunks'],
+        'total_chunks': progress['total_chunks'],
+        'is_complete': progress['completed_chunks'] >= progress['total_chunks'],
+        'chunks': progress['chunks']
+    }
+    
+    if progress.get('final_result'):
+        response['final_result'] = progress['final_result'][:100]  # First 100 for display
+        response['total_time'] = progress.get('total_time', 0)
+    
+    return jsonify(response)
 
-@app.route('/progress')
-def get_progress():
-    """Get overall progress"""
-    completed = 0
-    total = len(clients_connected)
+@app.route('/api/benchmarks')
+def get_benchmarks():
+    """Get all benchmark results"""
+    return jsonify({'benchmarks': benchmark_results[-10:]})  # Last 10 results
+
+@app.route('/api/batches')
+def get_batches():
+    """Get all batches"""
+    batch_list = []
+    for batch_id, batch_data in batches.items():
+        batch_list.append({
+            'id': batch_id,
+            'count': batch_data['count'],
+            'created_at': batch_data['created_at'],
+            'algorithm': batch_data['algorithm'],
+            'sample_data': batch_data['numbers'][:20]
+        })
     
-    for batch_id in batches:
-        if f'{batch_id}_results' in sorting_progress:
-            completed = len(sorting_progress[f'{batch_id}_results'])
-    
-    return jsonify({'completed': completed, 'total': total})
+    return jsonify({'batches': batch_list})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
