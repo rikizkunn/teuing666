@@ -412,6 +412,25 @@ def get_batches():
     
     return jsonify({'batches': batch_list})
 
+@app.route('/api/reset-benchmarks', methods=['POST'])
+def reset_benchmarks():
+    """Reset all benchmark data and performance stats"""
+    global benchmark_results, performance_stats
+    
+    benchmark_results.clear()
+    performance_stats['fastest'] = None
+    performance_stats['slowest'] = None
+    performance_stats['latest_serial'] = None
+    performance_stats['latest_parallel'] = None
+    performance_stats['average_times'].clear()
+    
+    print("Benchmark data reset")
+    
+    return jsonify({
+        'status': 'success',
+        'message': 'All benchmark data has been reset'
+    })
+
 if __name__ == '__main__':
     print("Starting Master Server...")
     print("Available algorithms:", list(get_algorithm_info().keys()))
