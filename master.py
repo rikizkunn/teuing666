@@ -6,6 +6,7 @@ import json
 from collections import defaultdict
 from datetime import datetime
 import threading
+from algorithms import get_algorithm_info
 
 app = Flask(__name__)
 
@@ -14,12 +15,19 @@ batches = {}
 clients_connected = {}
 sorting_progress = defaultdict(dict)
 benchmark_results = []
+network_benchmarks = []
 performance_stats = {
     'fastest': None,
     'slowest': None,
     'latest_serial': None,
     'latest_parallel': None,
-    'average_times': defaultdict(list)
+    'average_times': defaultdict(list),
+    'network_stats': {
+        'average_upload': 0,
+        'average_download': 0,
+        'average_rtt': 0,
+        'tests_count': 0
+    }
 }
 
 def cleanup_clients():
@@ -62,6 +70,34 @@ def update_performance_stats(benchmark):
     if len(performance_stats['average_times'][key]) > 10:
         performance_stats['average_times'][key] = performance_stats['average_times'][key][-10:]
 
+def update_network_stats(upload_speed, download_speed, rtt):
+    """Update network performance statistics"""
+    stats = performance_stats['network_stats']
+    stats['tests_count'] += 1
+    
+    # Update averages
+    if stats['average_upload'] == 0:
+        stats['average_upload'] = upload_speed
+        stats['average_download'] = download_speed
+        stats['average_rtt'] = rtt
+    else:
+        # Moving average
+        stats['average_upload'] = (stats['average_upload'] * (stats['tests_count'] - 1) + upload_speed) / stats['tests_count']
+        stats['average_download'] = (stats['average_download'] * (stats['tests_count'] - 1) + download_speed) / stats['tests_count']
+        stats['average_rtt'] = (stats['average_rtt'] * (stats['tests_count'] - 1) + rtt) / stats['tests_count']
+    
+    # Store individual test
+    network_benchmarks.append({
+        'upload_speed': upload_speed,
+        'download_speed': download_speed,
+        'round_trip_time': rtt,
+        'timestamp': datetime.now().isoformat()
+    })
+    
+    # Keep only last 20 network tests
+    if len(network_benchmarks) > 20:
+        network_benchmarks.pop(0)
+
 # Start cleanup thread
 cleanup_thread = threading.Thread(target=cleanup_clients, daemon=True)
 cleanup_thread.start()
@@ -83,6 +119,34 @@ def batch_detail(batch_id):
                          batch_id=batch_id,
                          batch_data=batch_data,
                          progress=progress)
+
+@app.route('/api/network-test', methods=['POST'])
+def network_test():
+    """Endpoint for network speed testing"""
+    data = request.json
+    test_data = data.get('data', [])
+    client_id = data.get('client_id', 'unknown')
+    
+    # Simulate some processing
+    start_time = time.time()
+    processed_data = sorted(test_data)  # Simple sort
+    processing_time = time.time() - start_time
+    
+    print(f"Network test from {client_id}: {len(test_data)} numbers, processed in {processing_time:.3f}s")
+    
+    return jsonify({
+        'status': 'success',
+        'processing_time': processing_time,
+        'data_size': len(test_data)
+    })
+
+@app.route('/api/algorithms')
+def get_algorithms():
+    """Get information about all available algorithms"""
+    return jsonify({
+        'algorithms': get_algorithm_info(),
+        'total_algorithms': len(get_algorithm_info())
+    })
 
 # API Routes
 @app.route('/api/generate', methods=['POST'])
@@ -115,6 +179,7 @@ def register_client():
         'id': client_id,
         'capabilities': data.get('capabilities', []),
         'algorithms': data.get('algorithms', ['quicksort']),
+        'algorithm_info': data.get('algorithm_info', {}),
         'hostname': data.get('hostname', 'unknown'),
         'system_info': data.get('system_info', {}),
         'last_seen': time.time(),
@@ -123,6 +188,7 @@ def register_client():
     }
     
     print(f"Client registered: {client_id}")
+    print(f"Client algorithms: {data.get('algorithms', [])}")
     return jsonify({'status': 'registered'})
 
 @app.route('/api/heartbeat', methods=['POST'])
@@ -282,6 +348,7 @@ def submit_work():
     processed_data = data['processed_data']
     processing_time = data['processing_time']
     chunk_id = data.get('chunk_id', 0)
+    network_time = data.get('network_time', 0)
     
     if batch_id not in sorting_progress:
         return jsonify({'status': 'error', 'message': 'Batch not found'})
@@ -292,6 +359,7 @@ def submit_work():
         progress['chunks'][chunk_id]['status'] = 'completed'
         progress['chunks'][chunk_id]['processed_data'] = processed_data
         progress['chunks'][chunk_id]['processing_time'] = processing_time
+        progress['chunks'][chunk_id]['network_time'] = network_time
         progress['completed_chunks'] += 1
         
         clients_connected[client_id]['status'] = 'idle'
@@ -308,6 +376,11 @@ def submit_work():
             progress['final_result'] = final_result
             progress['total_time'] = time.time() - progress['start_time']
             
+            # Calculate network overhead
+            total_network_time = sum(chunk.get('network_time', 0) for chunk in progress['chunks'].values())
+            total_processing_time = sum(chunk.get('processing_time', 0) for chunk in progress['chunks'].values())
+            network_overhead = total_network_time - total_processing_time
+            
             # Create benchmark record
             benchmark = {
                 'batch_id': batch_id,
@@ -315,6 +388,8 @@ def submit_work():
                 'algorithm': progress['algorithm'],
                 'total_numbers': len(final_result),
                 'total_time': progress['total_time'],
+                'processing_time': total_processing_time,
+                'network_overhead': network_overhead,
                 'clients_used': list(set(chunk['client_id'] for chunk in progress['chunks'].values())),
                 'clients_count': len(progress['chunks']),
                 'timestamp': datetime.now().isoformat()
@@ -323,6 +398,7 @@ def submit_work():
             benchmark_results.append(benchmark)
             update_performance_stats(benchmark)
             print(f"Benchmark saved: {benchmark['mode']} {benchmark['algorithm']} - {benchmark['total_time']:.3f}s")
+            print(f"Network overhead: {network_overhead:.3f}s ({network_overhead/benchmark['total_time']*100:.1f}%)")
     
     return jsonify({'status': 'success'})
 
@@ -354,7 +430,8 @@ def get_benchmarks():
     """Get all benchmark results with performance stats"""
     return jsonify({
         'benchmarks': benchmark_results[-10:],
-        'performance_stats': performance_stats
+        'performance_stats': performance_stats,
+        'network_benchmarks': network_benchmarks[-5:]
     })
 
 @app.route('/api/batch/<batch_id>')
@@ -399,4 +476,5 @@ def get_batches():
 
 if __name__ == '__main__':
     print("Starting Master Server...")
+    print("Available algorithms:", list(get_algorithm_info().keys()))
     app.run(host='0.0.0.0', port=5000, debug=True)

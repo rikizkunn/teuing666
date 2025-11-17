@@ -6,22 +6,19 @@ import socket
 import os
 import sys
 import platform
+from algorithms import ALGORITHMS, SIMPLE_ALGORITHMS, get_algorithm_info
 
 class Client:
     def __init__(self, server_url, client_name=None):
         self.server_url = server_url
         self.client_id = client_name or f"{socket.gethostname()}_{os.getpid()}"
-        self.algorithms = {
-            'quicksort': self.quick_sort,
-            'mergesort': self.merge_sort,
-            'bubblesort': self.bubble_sort
-        }
+        self.algorithms = list(ALGORITHMS.keys())
         self.running = True
         self.current_mode = None
         self.current_algorithm = None
         
         print(f"Starting Client: {self.client_id}")
-        print(f"Supported algorithms: {list(self.algorithms.keys())}")
+        print(f"Supported algorithms: {', '.join(self.algorithms)}")
         
         self.register()
         self.start_heartbeat()
@@ -66,7 +63,8 @@ class Client:
             response = requests.post(f"{self.server_url}/api/register", json={
                 'client_id': self.client_id,
                 'capabilities': ['serial', 'parallel'],
-                'algorithms': list(self.algorithms.keys()),
+                'algorithms': self.algorithms,
+                'algorithm_info': get_algorithm_info(),
                 'hostname': socket.gethostname(),
                 'system_info': self.get_system_info()
             }, timeout=5)
@@ -95,142 +93,47 @@ class Client:
         
         threading.Thread(target=heartbeat_loop, daemon=True).start()
     
-    def show_progress(self, current, total, algorithm):
-        """Show progress bar for sorting"""
-        if total == 0:
-            return
-        
-        percentage = (current / total) * 100
-        bar_length = 30
-        filled_length = int(bar_length * current // total)
-        bar = '=' * filled_length + '-' * (bar_length - filled_length)
-        
-        sys.stdout.write(f'\r{algorithm}: [{bar}] {percentage:.1f}% ({current}/{total})')
-        sys.stdout.flush()
-    
-    def quick_sort(self, arr):
-        """Quick sort implementation"""
-        if len(arr) <= 1:
-            return arr
-        
-        pivot = arr[len(arr) // 2]
-        left = [x for x in arr if x < pivot]
-        middle = [x for x in arr if x == pivot]
-        right = [x for x in arr if x > pivot]
-        
-        return self.quick_sort(left) + middle + self.quick_sort(right)
-    
-    def quick_sort_with_progress(self, arr, depth=0, max_depth=0):
-        """Quick sort with visual progress"""
-        if len(arr) <= 1:
-            return arr
-        
-        if depth == 0:
-            max_depth = len(arr).bit_length()
-            print(f"Quick Sort started on {len(arr)} elements")
-            print(f"Estimated depth: {max_depth} levels")
-        
-        pivot = arr[len(arr) // 2]
-        left = [x for x in arr if x < pivot]
-        middle = [x for x in arr if x == pivot]
-        right = [x for x in arr if x > pivot]
-        
-        # Show progress
-        progress = (depth / max_depth) * 100 if max_depth > 0 else 0
-        bar_length = 20
-        filled = int(bar_length * progress / 100)
-        bar = '=' * filled + '-' * (bar_length - filled)
-        print(f'\rQuick Sort: [{bar}] {progress:.1f}% | Depth: {depth}', end='')
-        
-        sorted_left = self.quick_sort_with_progress(left, depth + 1, max_depth)
-        sorted_right = self.quick_sort_with_progress(right, depth + 1, max_depth)
-        
-        if depth == 0:
-            print(f"\nQuick Sort completed!")
-        
-        return sorted_left + middle + sorted_right
-    
-    def merge_sort(self, arr, level=0, max_level=0):
-        """Merge sort with progress tracking"""
-        if len(arr) <= 1:
-            return arr
-        
-        if level == 0:
-            max_level = len(arr).bit_length()
-            print(f"Merge Sort started on {len(arr)} elements")
-            print(f"Estimated levels: {max_level}")
-        
-        mid = len(arr) // 2
-        left = self.merge_sort(arr[:mid], level + 1, max_level)
-        right = self.merge_sort(arr[mid:], level + 1, max_level)
-        
-        # Show progress
-        if max_level > 0:
-            progress = (level / max_level) * 100
-            bar_length = 20
-            filled = int(bar_length * progress / 100)
-            bar = '=' * filled + '-' * (bar_length - filled)
-            print(f'\rMerge Sort: [{bar}] {progress:.1f}% | Level: {level}', end='')
-        
-        result = self.merge(left, right)
-        
-        if level == 0:
-            print(f"\nMerge Sort completed!")
-        
-        return result
-    
-    def merge(self, left, right):
-        """Merge helper for merge sort"""
-        result = []
-        i = j = 0
-        
-        while i < len(left) and j in range(len(right)):
-            if left[i] < right[j]:
-                result.append(left[i])
-                i += 1
-            else:
-                result.append(right[j])
-                j += 1
-        
-        result.extend(left[i:])
-        result.extend(right[j:])
-        return result
-    
-    def bubble_sort(self, arr):
-        """Bubble sort with detailed progress"""
-        n = len(arr)
-        print(f"Bubble Sort started on {n} elements")
-        print(f"Total passes needed: ~{n}")
-        
-        for i in range(n):
-            swapped = False
+    def measure_network_speed(self, data_size=1000):
+        """Measure network speed by sending test data"""
+        try:
+            test_data = list(range(data_size))
             
-            for j in range(0, n - i - 1):
-                if arr[j] > arr[j + 1]:
-                    arr[j], arr[j + 1] = arr[j + 1], arr[j]
-                    swapped = True
+            # Measure upload speed
+            start_time = time.time()
+            response = requests.post(f"{self.server_url}/api/network-test", 
+                                   json={'data': test_data, 'client_id': self.client_id},
+                                   timeout=10)
+            upload_time = time.time() - start_time
             
-            # Show progress after each pass
-            progress = ((i + 1) / n) * 100
-            bar_length = 30
-            filled = int(bar_length * progress / 100)
-            bar = '=' * filled + '-' * (bar_length - filled)
-            
-            # Show some array samples to visualize sorting
-            sample_start = arr[:3] if len(arr) >= 3 else arr
-            sample_end = arr[-3:] if len(arr) >= 3 else []
-            
-            print(f'\rBubble Sort: [{bar}] {progress:.1f}% | Pass {i+1}/{n} | Sample: {sample_start}...{sample_end}', end='')
-            
-            if not swapped:
-                break
+            if response.status_code == 200:
+                result = response.json()
+                download_time = result.get('processing_time', 0)
+                
+                upload_speed = (data_size * 4) / upload_time  # Approximate bytes per second
+                download_speed = (data_size * 4) / download_time if download_time > 0 else 0
+                
+                print(f"Network Speed Test:")
+                print(f"  Upload: {upload_speed:.2f} bytes/sec")
+                print(f"  Download: {download_speed:.2f} bytes/sec")
+                print(f"  Round-trip: {upload_time + download_time:.3f}s")
+                
+                return {
+                    'upload_speed': upload_speed,
+                    'download_speed': download_speed,
+                    'round_trip_time': upload_time + download_time
+                }
+        except Exception as e:
+            print(f"Network speed test failed: {e}")
         
-        print(f"\nBubble Sort completed after {i+1} passes!")
-        return arr
+        return None
     
     def process_work(self):
         """Main work loop with enhanced progress visualization"""
         print("Starting work processor...")
+        
+        # Run initial network speed test
+        print("Performing initial network speed test...")
+        network_info = self.measure_network_speed(1000)
         
         while self.running:
             try:
@@ -261,19 +164,19 @@ class Client:
                 print(f"Chunk {chunk_id} | {len(data)} numbers | Algorithm: {algorithm}")
                 print(f"Data range: {min(data)} to {max(data)}")
                 
-                start_time = time.time()
+                # Record start time for network measurement
+                work_start_time = time.time()
                 
                 # Choose the appropriate sorting function
-                if algorithm == 'bubblesort':
-                    sorted_data = self.bubble_sort(data.copy())
-                elif algorithm == 'quicksort':
-                    sorted_data = self.quick_sort_with_progress(data.copy())
-                elif algorithm == 'mergesort':
-                    sorted_data = self.merge_sort(data.copy())
+                if algorithm in ALGORITHMS:
+                    sort_function, _ = ALGORITHMS[algorithm]
+                    sorted_data = sort_function(data.copy())
                 else:
-                    sorted_data = self.algorithms[algorithm](data.copy())
+                    # Fallback to simple version
+                    sorted_data = SIMPLE_ALGORITHMS.get(algorithm, SIMPLE_ALGORITHMS['quicksort'])(data.copy(), show_progress=False)
+                    print(f"Using simple {algorithm} (no progress display)")
                 
-                processing_time = time.time() - start_time
+                processing_time = time.time() - work_start_time
                 
                 # Verify sort
                 is_sorted = all(sorted_data[i] <= sorted_data[i+1] for i in range(len(sorted_data)-1))
@@ -289,13 +192,19 @@ class Client:
                     'client_id': self.client_id,
                     'processed_data': sorted_data,
                     'processing_time': processing_time,
-                    'chunk_id': chunk_id
+                    'chunk_id': chunk_id,
+                    'network_time': time.time() - work_start_time  # Total time including network
                 }, timeout=10)
                 
                 if submit_response.status_code == 200:
                     print("Result submitted successfully!")
                 else:
                     print("Submit failed")
+                
+                # Run periodic network speed test (every 10 minutes)
+                if int(time.time()) % 600 == 0:  # Every 10 minutes
+                    print("Running periodic network speed test...")
+                    self.measure_network_speed(1000)
                 
             except requests.exceptions.Timeout:
                 print("Request timeout")
@@ -321,10 +230,16 @@ def main():
     parser = argparse.ArgumentParser(description='Sorting Client')
     parser.add_argument('--server', default='http://localhost:5000', help='Master server URL')
     parser.add_argument('--name', help='Custom client name')
+    parser.add_argument('--network-test', action='store_true', help='Run network test and exit')
     
     args = parser.parse_args()
     
     client = Client(args.server, args.name)
+    
+    if args.network_test:
+        print("Running network speed test...")
+        client.measure_network_speed(5000)
+        return
     
     try:
         client.process_work()
